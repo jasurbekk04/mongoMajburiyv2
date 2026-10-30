@@ -160,25 +160,32 @@ bot.on('chat_join_request', async (ctx) => {
 // 6. Obunani tekshirish (Callback)
 bot.action('check_sub', async (ctx) => {
     try {
+        // Avval Telegram'ga javob beramiz (15s timeout oldini olish)
+        await ctx.answerCbQuery();
+        
         const unsubbed = await getUnsubscribedChannels(ctx, 'channels');
         if (unsubbed.length === 0) {
-            await ctx.editMessageText("✅ Rahmat! Obuna tasdiqlandi. Endi kod yuborishingiz mumkin.");
+            try {
+                await ctx.editMessageText("✅ Rahmat! Obuna tasdiqlandi. Endi kod yuborishingiz mumkin.");
+            } catch (err) {}
         } else {
             const buttons = unsubbed.map((l) => [Markup.button.url(l.name, l.link)]);
             buttons.push([Markup.button.callback("✅ Tekshirish", "check_sub")]);
-            
             try {
                 await ctx.editMessageReplyMarkup({ inline_keyboard: buttons });
-            } catch (err) {
-                // Ignore error if markup is the same
-            }
-            await ctx.answerCbQuery("❌ Shartni to'liq bajaring", { show_alert: true });
+            } catch (err) {}
+            try {
+                await ctx.telegram.sendMessage(ctx.from.id, "❌ Shartni to'liq bajaring! Barcha kanallarga obuna bo'ling.");
+            } catch (err) {}
         }
     } catch (e) { console.error("Action error:", e); }
 });
 
 bot.action('check_sub_2', async (ctx) => {
     try {
+        // Avval Telegram'ga javob beramiz (15s timeout oldini olish)
+        await ctx.answerCbQuery();
+
         const unsubbed1 = await getUnsubscribedChannels(ctx, 'channels');
         if (unsubbed1.length > 0) {
             const buttons = unsubbed1.map((l) => [Markup.button.url(l.name, l.link)]);
@@ -186,25 +193,32 @@ bot.action('check_sub_2', async (ctx) => {
             try {
                 await ctx.editMessageReplyMarkup({ inline_keyboard: buttons });
             } catch (err) {}
-            return ctx.answerCbQuery("❌ Oldin asosiy kanallarga a'zo bo'ling!", { show_alert: true });
+            try {
+                await ctx.telegram.sendMessage(ctx.from.id, "❌ Oldin asosiy kanallarga a'zo bo'ling!");
+            } catch (err) {}
+            return;
         }
 
         const unsubbed2 = await getUnsubscribedChannels(ctx, 'channels2');
         if (unsubbed2.length === 0) {
             const settings = await Config.findOne({ key: 'settings' });
             const link = settings ? settings.mandatoryLink : null;
-            if (link) {
-                await ctx.editMessageText(`✅ To'g'ri! Marhamat, kino linki:\n\n${link}`);
-            } else {
-                await ctx.editMessageText("❌ Xatolik: Admin tomonidan link o'rnatilmagan.");
-            }
+            try {
+                if (link) {
+                    await ctx.editMessageText(`✅ To'g'ri! Marhamat, kino linki:\n\n${link}`);
+                } else {
+                    await ctx.editMessageText("❌ Xatolik: Admin tomonidan link o'rnatilmagan.");
+                }
+            } catch (err) {}
         } else {
             const buttons = unsubbed2.map((l) => [Markup.button.url(l.name, l.link)]);
             buttons.push([Markup.button.callback("✅ Tekshirish", "check_sub_2")]);
             try {
                 await ctx.editMessageReplyMarkup({ inline_keyboard: buttons });
             } catch (err) {}
-            await ctx.answerCbQuery("❌ Shartni to'liq bajaring", { show_alert: true });
+            try {
+                await ctx.telegram.sendMessage(ctx.from.id, "❌ Shartni to'liq bajaring! Barcha kanallarga obuna bo'ling.");
+            } catch (err) {}
         }
     } catch (e) { console.error("Sub 2 Action Error:", e); }
 });
