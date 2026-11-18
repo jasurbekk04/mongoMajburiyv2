@@ -1,6 +1,12 @@
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
+
 const { Telegraf, Markup } = require('telegraf');
 const mongoose = require('mongoose');
 const http = require('http');
+const https = require('https');
 require('dotenv').config();
 
 // 1. Render/Railway Mini-Server
@@ -65,8 +71,24 @@ const configSchema = new mongoose.Schema({
 });
 const Config = mongoose.model('Config', configSchema);
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
-const ADMIN_ID = parseInt(process.env.ADMIN_ID);
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if (!BOT_TOKEN) {
+    console.error("❌ XATO: Telegram BOT_TOKEN o'zgaruvchisi topilmadi!");
+    process.exit(1);
+}
+
+// Telegram bilan barqaror ulanish (ECONNRESET va IPv6 xatolarini oldini olish)
+const httpsAgent = new https.Agent({
+    keepAlive: false,
+    timeout: 30000
+});
+
+const bot = new Telegraf(BOT_TOKEN, {
+    telegram: {
+        agent: httpsAgent
+    }
+});
+const ADMIN_ID = process.env.ADMIN_ID ? parseInt(process.env.ADMIN_ID) : null;
 
 let adminState = {};
 
@@ -463,13 +485,38 @@ bot.action('btn_no', ctx => {
 
 // 10. Global Xatolarni boshqarish
 bot.catch((err) => {
-    console.error("🔴 Global xato:", err.message);
+    console.error("🔴 Global Telegraf xatosi:", err.message || err);
 });
 
-// 11. Botni ishga tushirish
-bot.launch()
-    .then(() => console.log("🚀 Bot muvaffaqiyatli ishga tushdi!"))
-    .catch((err) => console.error("❌ Bot ishga tushmadi:", err));
+process.on('unhandledRejection', (reason) => {
+    console.error("⚠️ Unhandled Rejection:", reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error("⚠️ Uncaught Exception:", err);
+});
+
+// 11. Botni ishga tushirish (Avtomatik qayta urinish bilan)
+async function startBot() {
+    let attempts = 0;
+    while (true) {
+        attempts++;
+        try {
+            console.log(`⏳ Bot ishga tushirilmoqda (urinish: ${attempts})...`);
+            await bot.launch({
+                dropPendingUpdates: true
+            });
+            console.log("🚀 Bot muvaffaqiyatli ishga tushdi!");
+            break;
+        } catch (err) {
+            console.error(`❌ Bot ishga tushmadi (urinish ${attempts}):`, err.message || err);
+            console.log("⏳ 5 soniyadan so'ng qayta uriniladi...");
+            await sleep(5000);
+        }
+    }
+}
+
+startBot();
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
